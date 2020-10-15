@@ -9,8 +9,10 @@ import kotlin.math.floor
 
 sealed class Orders
 class NewOrder(val items: List<String>) : Orders()
+class SetStock(val apples: Int, val oranges: Int) : Orders()
 
-fun CoroutineScope.ordersActor(mail: SendChannel<Int>) = actor<Orders> {
+fun CoroutineScope.ordersActor(mail: SendChannel<String>) = actor<Orders> {
+    val stock: MutableMap<String, Int> = mutableMapOf()
     for (msg in channel) {
         when (msg) {
             is NewOrder -> {
@@ -24,7 +26,31 @@ fun CoroutineScope.ordersActor(mail: SendChannel<Int>) = actor<Orders> {
                     }
                 }
 
-                mail.send(getTotal(numApples, numOranges))
+                val outputString = StringBuilder()
+                var applesRemaining = stock.getOrDefault("apples", 0)
+                var orangesRemaining = stock.getOrDefault("oranges", 0)
+                if(numApples < applesRemaining && numOranges < orangesRemaining) {
+                    outputString.append("The total is " + getTotal(numApples, numOranges))
+                    applesRemaining -= numApples
+                    orangesRemaining -= numOranges
+                    stock["apples"] = applesRemaining
+                    stock["oranges"] = orangesRemaining
+                }
+                else {
+                    outputString.append("Error: ")
+
+                    if (numApples > applesRemaining)
+                        outputString.append("Apples Remaining $applesRemaining ")
+
+                    if (numOranges > orangesRemaining)
+                        outputString.append("Oranges remaining $orangesRemaining")
+                }
+
+                mail.send(outputString.toString())
+            }
+            is SetStock -> {
+                stock["apples"] = (stock.getOrDefault("apples", 0) + msg.apples)
+                stock["oranges"] = (stock.getOrDefault("oranges", 0) + msg.oranges)
             }
         }
     }
@@ -39,11 +65,11 @@ fun getTotal(apples: Int, oranges: Int): Int {
 }
 
 fun main(): Unit = runBlocking {
-    val mail = Channel<Int>()
+    val mail = Channel<String>()
 
     GlobalScope.launch {
         mail.consumeEach {
-            println("The total is $it")
+            println(it)
         }
     }
 
@@ -63,7 +89,6 @@ fun main(): Unit = runBlocking {
         }
 
         orders.send(NewOrder(items.toList()))
-        val response = CompletableDeferred<Int?>()
 
         println("Do you want to run again (Y/N): ")
         val input = readLine()
