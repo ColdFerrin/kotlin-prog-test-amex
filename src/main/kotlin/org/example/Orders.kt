@@ -1,18 +1,19 @@
 package org.example
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
+import kotlinx.coroutines.channels.consumeEach
 import kotlin.math.floor
 
 sealed class Orders
-class newOrder(val items: List<String>) : Orders()
-class getTotal(val response: CompletableDeferred<Int?>) : Orders()
+class NewOrder(val items: List<String>) : Orders()
 
-fun CoroutineScope.ordersActor() = actor<Orders> {
-    val totals = mutableListOf<Int>()
+fun CoroutineScope.ordersActor(mail: SendChannel<Int>) = actor<Orders> {
     for (msg in channel) {
         when (msg) {
-            is newOrder -> {
+            is NewOrder -> {
                 var numApples = 0
                 var numOranges = 0
                 msg.items.forEach {
@@ -23,9 +24,8 @@ fun CoroutineScope.ordersActor() = actor<Orders> {
                     }
                 }
 
-                totals.add(getTotal(numApples, numOranges))
+                mail.send(getTotal(numApples, numOranges))
             }
-            is getTotal -> msg.response.complete(totals.removeFirstOrNull())
         }
     }
 }
@@ -38,8 +38,16 @@ fun getTotal(apples: Int, oranges: Int): Int {
     return total
 }
 
-fun main() = runBlocking<Unit> {
-    val orders = ordersActor()
+fun main(): Unit = runBlocking {
+    val mail = Channel<Int>()
+
+    GlobalScope.launch {
+        mail.consumeEach {
+            println("The total is $it")
+        }
+    }
+
+    val orders = ordersActor(mail)
     var notDone = true
     while (notDone) {
         val items = mutableListOf<String>()
@@ -54,16 +62,16 @@ fun main() = runBlocking<Unit> {
             }
         }
 
-        orders.send(newOrder(items.toList()))
+        orders.send(NewOrder(items.toList()))
         val response = CompletableDeferred<Int?>()
-        orders.send(getTotal(response))
-        println("total = ${response.await()}")
 
         println("Do you want to run again (Y/N): ")
         val input = readLine()
         if(input == "n" || input == "N"){
             notDone = false
         }
+
+
     }
 
     orders.close()
