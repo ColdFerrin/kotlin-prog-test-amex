@@ -1,12 +1,9 @@
 package org.example
 
-import com.fasterxml.jackson.core.io.JsonStringEncoder
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.util.StdDateFormat
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import io.confluent.kafka.serializers.KafkaAvroSerializer
-import kafka.utils.json.JsonObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
@@ -51,7 +48,7 @@ fun CoroutineScope.ordersActor(mail: SendChannel<String>) = actor<Orders> {
                 val outputString = StringBuilder()
                 var applesRemaining = stock.getOrDefault("apples", 0)
                 var orangesRemaining = stock.getOrDefault("oranges", 0)
-                if (numApples < applesRemaining && numOranges < orangesRemaining) {
+                if (numApples <= applesRemaining && numOranges <= orangesRemaining) {
                     outputString.append("The total is " + getTotal(numApples, numOranges))
                     applesRemaining -= numApples
                     orangesRemaining -= numOranges

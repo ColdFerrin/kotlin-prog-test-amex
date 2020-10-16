@@ -93,4 +93,22 @@ class OrdersTest {
         orders.close()
     }
 
+    @Test fun `Test service with apple apple orange apple sequence equal apple stock`(): Unit = runBlocking {
+        val orders = ordersActor(mail)
+        orders.send(SetStock(3, 10))
+        orders.send(NewOrder(listOf("apple", "apple", "orange", "apple")))
+        val total = mail.receive()
+        assertEquals("The total is 145", total)
+        orders.close()
+    }
+
+    @Test fun `Test service with apple apple orange apple sequence equal orange stock`(): Unit = runBlocking {
+        val orders = ordersActor(mail)
+        orders.send(SetStock(10, 1))
+        orders.send(NewOrder(listOf("apple", "apple", "orange", "apple")))
+        val total = mail.receive()
+        assertEquals("The total is 145", total)
+        orders.close()
+    }
+
 }
